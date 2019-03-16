@@ -152,7 +152,7 @@ exit_with_error:
 
 
         section         .rodata
-incorrect_args_msg:   db      "q"
+incorrect_args_msg:   db      "invalid arguments"
 incorrect_args_msg_size: equ $ - incorrect_args_msg
 open_fail_msg:        db      "open failed"
 open_fail_msg_size: equ $ - open_fail_msg
@@ -163,6 +163,7 @@ write_fail_msg_size: equ $ - write_fail_msg
 
         section         .bss
 
-buf         resb        32
+buf         resb        1024
 buf_len     resq        1
 fd          resq        1
+
