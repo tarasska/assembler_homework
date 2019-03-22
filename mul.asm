@@ -25,7 +25,7 @@ _start:
 ;    rsi -- address of number #2 (long number)
 ;    rcx -- length of long numbers in qwords
 ; result:
-;    mul is written to rax
+;    mul is written to rdi
 ;    rcx -- result length
 mul_long_long:
                 push            rdi
@@ -39,11 +39,8 @@ mul_long_long:
                 push            r15
 
                 sub             rsp, 2 * 256 * 8 ;reserved memory
-                mov             r13, rdi
-                mov             rcx, 256
-                mov             rdi, rsp
-                call            set_zero ;set zero in new memory
-                mov             rdi, r13
+                mov             r14, rsp
+                call            set_zero_with_save_reg
 
                 ;r8 -> buffer for rdi(save input number), r9 -> result
                 lea             r8, [rsp]
@@ -56,23 +53,25 @@ mul_long_long:
                 mov             r8, rdi
                 mov             rdi, r11
 
-                ;xor             r15, r15 ;size of shift
-                xor             r15, r15
-                mov             r13, rcx ;loop it;
+
+                xor             r15, r15 ;shift size
+                mov             r13, rcx ;loop it
                 mov             rcx, 256
-                mov             rdx, 2 ;cur size of result number;
                 clc
                 multiplication_loop:
+                        ;multiply zero acceleration
                         jmp            if_digit_is_zero
                         continue:
                         mov             rbx, [rsi]
+                        ;multiply first long number by [rsi]
                         call            mul_long_short
-                        mov             rcx, 129
+                        ;shift of the result of multiplication by several qwords
                         call            shift_rdi
-                        mov             rcx, 256
                         mov             r10, rsi
                         mov             rsi, r9
+                        ;addition multiplication step and result
                         call            add_long_long
+                        ;r8 (orignals value of long number) -> rdi
                         call            move_buffer_to_reg
                         mov             rsi, r10
                         lea             rsi, [rsi + 8]
@@ -82,6 +81,8 @@ mul_long_long:
                 mul_end:
                 mov             rdi, r8
                 mov             r8, r9
+                ;r9 -> rdi : move multiplication result to rdi
+                ;instead of the first number
                 call            move_buffer_to_reg
                 add             rsp, 2 * 256 * 8
 
@@ -96,13 +97,16 @@ mul_long_long:
                 pop             rdi
 
 
-
-
+; rdi - address of long number
+; r15 - shift size
+; rcx - length of long number in q qwords
 shift_rdi:
+                push            rdx
                 push            r15
                 push            rbx
                 push            rcx
                 push            rdi
+                mov             rcx, 129
                 lea             rdi, [rdi + rcx * 8]
                 .shift_loop:
                         sub             rdi, 8
@@ -128,6 +132,7 @@ shift_rdi:
                 pop             rcx
                 pop             rbx
                 pop             r15
+                pop             rdx
                 ret
 
 
@@ -143,11 +148,14 @@ if_digit_is_zero:
                 dec             r13
                 jmp             multiplication_loop
 
+
+; r14 - adress of previous
+;
 set_zero_with_save_reg:
                 push            rcx
                 push            rdi
                 mov             rcx, 256
-                mov             rdi, rsp
+                mov             rdi, r14
                 call            set_zero
                 pop             rdi
                 pop             rcx
@@ -160,13 +168,13 @@ move_buffer_to_reg:
                 push            rcx
                 push            r8
                 push            r9
-                loop1:
+                .loop:
                     mov             r9, [r8]
                     mov             [rdi], r9
                     lea             rdi, [rdi + 8]
                     lea             r8, [r8 + 8]
                     dec             rcx
-                    jnz             loop1
+                    jnz             .loop
 
                 pop             r9
                 pop             r8
@@ -183,13 +191,13 @@ move_reg_to_buffer:
                 push            r8
                 push            r9
                 xor             r9, r9
-                loop2:
+                .loop:
                     mov             r9, [rdi]
                     mov             [r8], r9
                     lea             rdi, [rdi + 8]
                     lea             r8, [r8 + 8]
                     dec             rcx
-                    jnz             loop2
+                    jnz             .loop
 
                 pop             r9
                 pop             r8
